@@ -1,7 +1,7 @@
 # ClinicalFlow
 
 ## Project Description
-ClinicalFlow is a RESTful ASP.NET Core Web API for managing patient records, clinical encounters, and multi-medication prescriptions. It uses JWT bearer authentication, DTO validation, Entity Framework Core, and SQL Server, with encounter lifecycle rules and transactional prescription persistence.
+ClinicalFlow is a RESTful ASP.NET Core Web API for managing patient accounts, doctor accounts, patient records, clinical encounters, and multi-medication prescriptions. It uses JWT bearer authentication, role-based authorization, DTO validation, Entity Framework Core, SQL Server, password hashing, transactional persistence, and centralized exception handling.
 
 ## Overview
 ClinicalFlow supports a basic clinical workflow: authenticated users manage patient records, create encounters linked to patients and doctors, document and update encounters while in progress, complete encounters, and create prescriptions containing one or more medication entries.
@@ -10,11 +10,15 @@ This is a backend project/reference implementation, not a certified electronic h
 
 ## Features
 - Patient creation, listing, retrieval, and updates.
+- Patient accounts backed by ApplicationUser with email/password authentication and hashed passwords.
+- Admin-only doctor provisioning with an ApplicationUser account and Doctor profile.
+- Admin-only doctor listing.
 - Encounter creation, retrieval, patient-based listing, updating, and completion.
 - Encounter lifecycle rules: encounters start in progress; updates and completion are restricted to in-progress encounters.
 - Prescription creation with multiple medication items and retrieval by encounter.
 - Transactional persistence for prescription and medication records.
-- JWT login and bearer-token protection for patient, encounter, and prescription endpoints.
+- JWT login and bearer-token protection for patient, encounter, prescription, and Admin endpoints.
+- Role-based access for Admin, Doctor, Nurse, and Patient roles.
 - DTO-based request validation and centralized exception handling.
 - EF Core persistence using Microsoft SQL Server.
 - Optional development-only seed user with hashed password storage.
@@ -37,6 +41,7 @@ This is a backend project/reference implementation, not a certified electronic h
 - `ClinicalFlow/Middleware` — centralized exception handling
 - `ClinicalFlow/Models` — application and persistence entities
 - `ClinicalFlow/Services` — application/business logic
+- `ClinicalFlow/Migrations` — EF Core migrations and model snapshot
 - `ClinicalFlow/Program.cs` — dependency injection, authentication, and HTTP pipeline
 - `Clinical-WorkFlow.postman_collection.json` — Postman request collection
 
@@ -58,8 +63,8 @@ dotnet --version
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/chauhan12harsh/ClinicalFlow-forked.git
-cd ClinicalFlow-forked/ClinicalFlow
+git clone https://github.com/chauhan12harsh/ClinicalFlow.git
+cd ClinicalFlow/ClinicalFlow
 ```
 
 ### 2. Configure the database
@@ -87,14 +92,15 @@ Use a cryptographically random secret. Never commit signing keys or production s
 
 ### 4. Optional development seed user
 
-In the Development environment, a seed account is created only when all four values are configured. The password is hashed before persistence.
+In the Development environment, `Program.cs` can create a Doctor seed account when email, password, and full name are configured. The password is hashed before persistence.
 
 ```bash
 dotnet user-secrets set "DevelopmentSeed:Email" "doctor@example.com"
 dotnet user-secrets set "DevelopmentSeed:Password" "use-a-strong-local-password"
 dotnet user-secrets set "DevelopmentSeed:FullName" "Development Doctor"
-dotnet user-secrets set "DevelopmentSeed:Role" "Doctor"
 ```
+
+The current seed creates the account with the `Doctor` role; `DevelopmentSeed:Role` is not read by the current implementation.
 
 This is for local development only and is not a production user-provisioning mechanism.
 
@@ -157,7 +163,14 @@ All endpoints are relative to the API base URL. Except login, the routes below r
 | GET | `/api/patients/{id}` | Get a patient by ID |
 | PUT | `/api/patients/{id}` | Update patient details |
 
-Patient DTOs validate required names and MRN, applicable length limits, and email/phone formats. MRN is not included in the update request.
+Patient DTOs validate required names and MRN, applicable length limits, and email/phone formats. Patient creation also requires a password because a Patient ApplicationUser account is created. MRN is not included in the update request.
+
+### Admin / Doctors
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/admin/createdoctor` | Admin-only doctor + ApplicationUser creation |
+| GET | `/api/admin/doctors` | Admin-only doctor listing |
 
 ### Encounters
 
@@ -205,11 +218,11 @@ Run automated tests with `dotnet test` if a test project is available. The Postm
 - Use User Secrets locally and a managed secret store/environment configuration in deployed environments.
 - Use HTTPS outside isolated local development.
 - Use synthetic data for development and testing; apply applicable privacy, access-control, retention, and security requirements before handling clinical data.
-- The current controllers enforce authentication; review role/claim authorization and deployment security before production use.
+- The current controllers enforce authentication and role-based authorization. Encounter creation currently accepts `DoctorId` from the request; deriving the Doctor from the authenticated JWT identity is a planned authorization hardening step. Review service/domain-level authorization and deployment security before production use.
 - Plan database backups, access controls, monitoring, logging, and secret rotation for deployments.
 
 ## Future Improvements
-Potential follow-up work includes pagination and filtering, expanded automated integration tests, explicit role/claim authorization policies, OpenAPI/Swagger documentation, and deployment-specific observability/configuration.
+Potential follow-up work includes deriving DoctorId from the authenticated user, making ApplicationUser.Email the single source of truth instead of duplicating email on Doctor/Patient, expanded automated integration tests, richer OpenAPI/Swagger documentation, pagination/filtering, audit logging, and deployment-specific observability/configuration.
 
 ## License
 No license is currently specified in this repository. Unless a license is added, reuse and redistribution remain subject to the repository owner's rights.
